@@ -1,4 +1,4 @@
-import streamlit as st
+import gradio as gr
 import joblib
 import nltk
 import re
@@ -16,38 +16,46 @@ def clean_text(text):
 try:
     model = joblib.load("model.pkl")
     vectorizer = joblib.load("vectorizer.pkl")
-    accuracies = joblib.load("accuracies.pkl")  
-    y_test, preds = joblib.load("results.pkl") 
+    accuracies = joblib.load("accuracies.pkl")
+    y_test, preds = joblib.load("results.pkl")
 except:
-    st.error(" Required files not found. Please upload all .pkl files.")
-    st.stop()
-st.set_page_config(page_title="Movie Sentiment Analysis", page_icon="🎬")
-st.title(" Movie Sentiment Analysis with Visualization")
-st.header(" Predict Sentiment")
-review = st.text_area("Enter your review:")
-if st.button("Analyze"):
-    if review.strip():
-        clean = clean_text(review)
-        vec = vectorizer.transform([clean])
-        pred = model.predict(vec)[0]
-        if pred == 1:
-            st.success("😊 Positive Review")
-        else:
-            st.error("😠 Negative Review")
-    else:
-        st.warning("Please enter a review")
-st.header(" Model Accuracy Comparison")
-fig1 = plt.figure()
-plt.bar(accuracies.keys(), accuracies.values())
-plt.xlabel("Models")
-plt.ylabel("Accuracy")
-plt.title("Model Comparison")
-st.pyplot(fig1)
-best_model = max(accuracies, key=accuracies.get)
-st.success(f"🏆 Best Model: {best_model}")
-st.header("Confusion Matrix")
-cm = confusion_matrix(y_test, preds)
-fig2, ax = plt.subplots()
-disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-disp.plot(ax=ax)
-st.pyplot(fig2)
+    raise Exception("Required .pkl files not found!")
+def predict_sentiment(review):
+    if review.strip() == "":
+        return " Please enter a review", None, None
+
+    clean = clean_text(review)
+    vec = vectorizer.transform([clean])
+    pred = model.predict(vec)[0]
+
+    result = "😊 Positive Review" if pred == 1 else "😠 Negative Review"
+
+    fig1 = plt.figure()
+    plt.bar(accuracies.keys(), accuracies.values())
+    plt.xlabel("Models")
+    plt.ylabel("Accuracy")
+    plt.title("Model Comparison")
+    cm = confusion_matrix(y_test, preds)
+
+    fig2, ax = plt.subplots()
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(ax=ax)
+
+    return result, fig1, fig2
+with gr.Blocks() as app:
+    gr.Markdown("# 🎬 Movie Sentiment Analysis with Visualization")
+
+    review_input = gr.Textbox(label="Enter your review")
+
+    output_text = gr.Textbox(label="Prediction")
+    output_graph1 = gr.Plot(label="Accuracy Comparison")
+    output_graph2 = gr.Plot(label="Confusion Matrix")
+
+    analyze_btn = gr.Button("Analyze")
+
+    analyze_btn.click(
+        fn=predict_sentiment,
+        inputs=review_input,
+        outputs=[output_text, output_graph1, output_graph2]
+    )
+app.launch()
